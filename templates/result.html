@@ -18,9 +18,10 @@
 
       {% if suggestions %}
       <div class="card">
-        <h2>💡 Nearby Smart Suggestions</h2>
-        <p>These are similar properties within 3 km of your location:</p>
-
+        <h2>💡 Smart Value Suggestions</h2>
+        {% if fallback_message %}
+          <p style="color: gray; font-style: italic;">{{ fallback_message }}</p>
+        {% endif %}
         <table>
           <thead>
             <tr>
@@ -53,7 +54,7 @@
         </table>
       </div>
       {% else %}
-      <p style="margin-top:20px;">😕 No nearby listings found within 3 km. Try another locality.</p>
+      <p style="margin-top:20px;">😕 No nearby listings found within 8 km. Try increasing budget or changing locality.</p>
       {% endif %}
 
       <a class="back" href="/">← Back</a>

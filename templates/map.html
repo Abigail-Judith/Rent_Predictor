@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>SmartRent — Interactive Rent Map</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+      iframe {
+        width: 100%;
+        height: 600px;
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🗺️ SmartRent — Rent Map</h1>
+      <p>Visualize rent listings and trends across Bengaluru.</p>
+
+      <iframe src="{{ url_for('static', filename='rent_map.html') }}"></iframe>
+
+      <a class="back" href="/">← Back</a>
+    </div>
+  </body>
+</html>

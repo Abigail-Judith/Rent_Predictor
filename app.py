@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import joblib
 import math
+from generate_map import generate_rent_map  # ✅ We'll use this to generate the map
 
 app = Flask(__name__)
 
@@ -17,48 +18,54 @@ le_city = encoders["city"]
 le_locality = encoders["locality"]
 le_furnish = encoders["furnishing"]
 
-# Load dataset for suggestions (make sure it includes latitude & longitude)
+# Load dataset (includes latitude, longitude)
 data = pd.read_csv("data/rent_listings_encoded.csv")
+
 
 # -----------------------------
 # Helper Functions
 # -----------------------------
 def safe_encode(label, encoder):
-    """Encode a single value safely (for user input)."""
+    """Encode user input safely."""
     if label not in encoder.classes_:
         encoder.classes_ = np.append(encoder.classes_, label)
     return encoder.transform([label])[0]
 
-def encode_column_safe(col, encoder):
-    """Encode a pandas column safely (for suggestion dataset)."""
-    encoded = []
-    for val in col.astype(str).str.strip():
-        if val not in encoder.classes_:
-            encoder.classes_ = np.append(encoder.classes_, val)
-        encoded.append(encoder.transform([val])[0])
-    return encoded
+
+def ensure_encoded(series, encoder):
+    """Ensure text column is encoded numerically."""
+    if pd.api.types.is_numeric_dtype(series):
+        return series.astype(int)
+    vals = series.astype(str).str.strip()
+    unseen = np.setdiff1d(vals.unique(), encoder.classes_)
+    if unseen.size:
+        encoder.classes_ = np.concatenate([encoder.classes_, unseen])
+    return encoder.transform(vals)
+
 
 def haversine(lat1, lon1, lat2, lon2):
     """Calculate distance (in km) between two lat/lon points."""
-    R = 6371  # Earth radius in km
+    R = 6371
     lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-    c = 2 * math.asin(math.sqrt(a))
-    return R * c
+    dlat, dlon = lat2 - lat1, lon2 - lon1
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    return 2 * R * math.asin(math.sqrt(a))
+
 
 # -----------------------------
 # Routes
 # -----------------------------
 @app.route("/")
 def home():
+    """Homepage with prediction form + interactive rent map"""
+    # Automatically generate the latest rent map from data
+    generate_rent_map("data/rent_listings_sample.csv", "static/rent_map.html")
     return render_template("index.html")
 
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    # --------- 1️⃣ Collect User Input ---------
+    # --------- 1️⃣ Collect Input ---------
     city = request.form["city"]
     locality = request.form["locality"]
     bhk = int(request.form["bhk"])
@@ -69,7 +76,7 @@ def predict():
     age = int(request.form["age"])
     listed = int(request.form["listed_rent"])
 
-    # --------- 2️⃣ Encode Input Safely ---------
+    # --------- 2️⃣ Encode Input ---------
     city_enc = safe_encode(city, le_city)
     locality_enc = safe_encode(locality, le_locality)
     furnish_enc = safe_encode(furnishing, le_furnish)
@@ -81,7 +88,6 @@ def predict():
     diff = listed - pred
     pct = (diff / pred) * 100 if pred else 0
 
-    # --------- 4️⃣ Verdict ---------
     if pct > 10:
         verdict = f"❌ Overpriced by {pct:.1f}%"
         color_class = "red"
@@ -94,57 +100,82 @@ def predict():
 
     insight = f"For a {bhk}BHK ~{size} sqft in {locality}, fair rent is around ₹{int(pred):,}."
 
-    # --------- 5️⃣ Geo-Smart Suggestions ---------
+    # --------- 4️⃣ Prepare Dataset ---------
     df = data.copy()
-
-    # Ensure all encodings are numeric
-    df["city"] = encode_column_safe(df["city"], le_city)
-    df["locality"] = encode_column_safe(df["locality"], le_locality)
-    df["furnishing"] = encode_column_safe(df["furnishing"], le_furnish)
+    df["city"] = ensure_encoded(df["city"], le_city)
+    df["locality"] = ensure_encoded(df["locality"], le_locality)
+    df["furnishing"] = ensure_encoded(df["furnishing"], le_furnish)
 
     features = df[["city", "locality", "bhk", "size_sqft", "bathrooms",
                    "furnishing", "parking", "age_yrs"]]
     df["pred_rent"] = model.predict(features)
-    df["value_score"] = df["pred_rent"] / df["rent"].clip(lower=1)
+    df["value_score"] = (df["pred_rent"] - df["rent"]) / df["pred_rent"].replace(0, np.nan)
 
-    # Get coordinates of the user's chosen locality (first match)
+    # --------- 5️⃣ Compute Distances ---------
     if "latitude" in df.columns and "longitude" in df.columns:
         try:
             loc_ref = data[data["locality"] == locality].iloc[0]
             lat_user, lon_user = float(loc_ref["latitude"]), float(loc_ref["longitude"])
             df["distance_km"] = df.apply(
-                lambda r: haversine(lat_user, lon_user, float(r["latitude"]), float(r["longitude"])), axis=1
+                lambda r: haversine(lat_user, lon_user, float(r["latitude"]), float(r["longitude"])),
+                axis=1,
             )
         except Exception:
-            df["distance_km"] = 9999
+            df["distance_km"] = 9999.0
     else:
-        df["distance_km"] = 9999  # fallback if no lat/lon
+        df["distance_km"] = 9999.0
 
-    # Filter: same city, within 3 km, similar size ±20%
-    df_filtered = df[
-        (df["city"] == city_enc)
-        & (df["bhk"] == bhk)
-        & (df["size_sqft"].between(size * 0.8, size * 1.2))
-        & (df["distance_km"] <= 3)
-    ]
+    # --------- 6️⃣ Generate Suggestions ---------
+    candidates = df[df["city"] == city_enc].copy()
 
-    # Fallback if empty
-    if df_filtered.empty:
-        df_filtered = df[df["city"] == city_enc]
+    def top5(df_):
+        cols = ["locality", "bhk", "size_sqft", "bathrooms", "furnishing",
+                "rent", "pred_rent", "value_score", "distance_km"]
+        out = df_.sort_values("value_score", ascending=False)[cols].head(5).copy()
+        if not out.empty:
+            out["pred_rent"] = out["pred_rent"].round(0)
+            out["value_score"] = out["value_score"].round(2)
+            out["distance_km"] = out["distance_km"].round(2)
+        return out
 
-    suggestions = (
-        df_filtered.sort_values("value_score", ascending=False)
-        .head(5)
-        [["locality", "bhk", "size_sqft", "bathrooms", "furnishing",
-          "rent", "pred_rent", "value_score", "distance_km"]]
+    fallback_message = ""
+
+    # 🧠 Budget adjustment logic
+    if listed > pred:
+        # overpriced → show cheaper options
+        max_budget = pred * 1.05
+    else:
+        # underpriced → show slightly better quality
+        max_budget = pred * 1.3
+
+    # Step 1: Nearby, similar size ±20%
+    mask = (
+        (candidates["bhk"] == bhk)
+        & (candidates["size_sqft"].between(size * 0.8, size * 1.2))
+        & (candidates["distance_km"] <= 6)
+        & (candidates["rent"] <= max_budget)
     )
+    sug = top5(candidates[mask])
 
-    if not suggestions.empty:
-        suggestions["pred_rent"] = suggestions["pred_rent"].round(0)
-        suggestions["value_score"] = suggestions["value_score"].round(2)
-        suggestions["distance_km"] = suggestions["distance_km"].round(2)
+    # Step 2: Expand to 8 km
+    if sug.empty:
+        mask = (
+            (candidates["bhk"] == bhk)
+            & (candidates["size_sqft"].between(size * 0.7, size * 1.3))
+            & (candidates["distance_km"] <= 8)
+            & (candidates["rent"] <= max_budget)
+        )
+        sug = top5(candidates[mask])
 
-    # --------- 6️⃣ Render Result Page ---------
+    # Step 3: City-wide top deals (no budget restriction)
+    if sug.empty:
+        sug = top5(candidates)
+        fallback_message = "⚠️ No exact in-budget matches nearby. Showing best value rentals in Bengaluru."
+
+    if not sug.empty and not fallback_message:
+        fallback_message = f"🏙️ Showing best value rentals near {locality}."
+
+    # --------- 7️⃣ Render Result Page ---------
     return render_template(
         "result.html",
         predicted=int(pred),
@@ -152,8 +183,15 @@ def predict():
         verdict=verdict,
         color_class=color_class,
         insight=insight,
-        suggestions=suggestions.to_dict(orient="records") if not suggestions.empty else []
+        suggestions=sug.to_dict(orient="records") if not sug.empty else [],
+        fallback_message=fallback_message,
     )
+
+
+@app.route("/map")
+def rent_map():
+    generate_rent_map("data/rent_listings_sample.csv", "static/rent_map.html")
+    return render_template("map.html")
 
 
 if __name__ == "__main__":

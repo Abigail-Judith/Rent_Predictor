@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>SmartRent — Result</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <div class="container">
+      <h1>🏠 SmartRent — Result</h1>
+
+      <div class="card">
+        <h3>Predicted Fair Rent: <b>₹{{ predicted }}</b></h3>
+        <h3>Listed Rent: <b>₹{{ listed }}</b></h3>
+        <h2 class="{{ color_class }}">{{ verdict }}</h2>
+        <p>{{ insight }}</p>
+      </div>
+
+      {% if suggestions %}
+      <div class="card">
+        <h2>💡 Nearby Smart Suggestions</h2>
+        <p>These are similar properties within 3 km of your location:</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Locality</th>
+              <th>BHK</th>
+              <th>Size (sqft)</th>
+              <th>Bath</th>
+              <th>Furnishing</th>
+              <th>Rent (₹)</th>
+              <th>Fair Rent (₹)</th>
+              <th>Value Score</th>
+              <th>Distance (km)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in suggestions %}
+            <tr>
+              <td>{{ s.locality }}</td>
+              <td>{{ s.bhk }}</td>
+              <td>{{ s.size_sqft }}</td>
+              <td>{{ s.bathrooms }}</td>
+              <td>{{ s.furnishing }}</td>
+              <td>{{ s.rent }}</td>
+              <td>{{ s.pred_rent }}</td>
+              <td>{{ s.value_score }}</td>
+              <td>{{ s.distance_km }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p style="margin-top:20px;">😕 No nearby listings found within 3 km. Try another locality.</p>
+      {% endif %}
+
+      <a class="back" href="/">← Back</a>
+    </div>
+  </body>
+</html>

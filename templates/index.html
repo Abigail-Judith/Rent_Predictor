@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>SmartRent — Predict Rent</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <div class="container">
+      <h1>🏠 SmartRent</h1>
+      <h3>Predict Fair Rent & Check Overpricing</h3>
+
+      <form action="/predict" method="post">
+        <label>City</label>
+        <input type="text" name="city" placeholder="Bengaluru" required>
+
+        <label>Locality</label>
+        <input type="text" name="locality" placeholder="Whitefield" required>
+
+        <label>BHK</label>
+        <input type="number" name="bhk" value="2" required>
+
+        <label>Size (sqft)</label>
+        <input type="number" name="size" value="1000" required>
+
+        <label>Bathrooms</label>
+        <input type="number" name="bath" value="2" required>
+
+        <label>Furnishing</label>
+        <select name="furnishing">
+          <option>Unfurnished</option>
+          <option>Semi</option>
+          <option>Fully</option>
+        </select>
+
+        <label>Parking Spots</label>
+        <input type="number" name="parking" value="1" required>
+
+        <label>Property Age (years)</label>
+        <input type="number" name="age" value="5" required>
+
+        <label>Listed Rent (₹/month)</label>
+        <input type="number" name="listed_rent" value="25000" required>
+
+        <button type="submit">Predict</button>
+      </form>
+    </div>
+  </body>
+</html>

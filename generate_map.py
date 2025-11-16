@@ -1,36 +1,18 @@
 import folium
+from folium.plugins import MarkerCluster
 import pandas as pd
 
-def generate_rent_map(csv_path="data/rent_listings_sample.csv", output_path="static/rent_map.html"):
-    """Generates an interactive rent map using Folium."""
-
+def generate_rent_map_obj(csv_path="data/rent_listings_sample.csv"):
     df = pd.read_csv(csv_path)
-
-    # Ensure dataset has lat/lon info
-    if not {"latitude", "longitude", "locality", "rent"}.issubset(df.columns):
-        raise ValueError("Dataset must include latitude, longitude, locality, and rent columns.")
-
-    # Center on average Bengaluru coordinates
-    center_lat = df["latitude"].mean()
-    center_lon = df["longitude"].mean()
-    rent_map = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="CartoDB positron")
-
-    # Add listings
-    for _, row in df.iterrows():
-        popup_html = f"""
-        <b>🏠 Locality:</b> {row['locality']}<br>
-        <b>BHK:</b> {row['bhk']} | <b>Size:</b> {row['size_sqft']} sqft<br>
-        <b>Rent:</b> ₹{row['rent']}
-        """
-        color = "blue" if row["rent"] < 25000 else "orange" if row["rent"] < 45000 else "red"
-        folium.CircleMarker(
-            location=[row["latitude"], row["longitude"]],
-            radius=6,
-            popup=popup_html,
-            color=color,
-            fill=True,
-            fill_opacity=0.7,
-        ).add_to(rent_map)
-
-    rent_map.save(output_path)
-    print(f"✅ Rent map updated → {output_path}")
+    center_lat = df["latitude"].median()
+    center_lon = df["longitude"].median()
+    m = folium.Map(location=[center_lat, center_lon], zoom_start=12, tiles="CartoDB positron")
+    mc = MarkerCluster()
+    p25, p75 = df["rent"].quantile(0.25), df["rent"].quantile(0.75)
+    for _, r in df.iterrows():
+        rent = r["rent"]
+        color = "blue" if rent < p25 else "red" if rent > p75 else "orange"
+        popup = f"<b>Locality:</b> {r['locality']}<br><b>BHK:</b> {r['bhk']} | <b>Size:</b> {r['size_sqft']} sqft<br><b>Rent:</b> ₹{int(r['rent']):,}"
+        folium.CircleMarker(location=[r["latitude"], r["longitude"]], radius=6, color=color, fill=True, fill_opacity=0.7, popup=popup).add_to(mc)
+    mc.add_to(m)
+    return m

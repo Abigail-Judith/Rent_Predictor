@@ -9,6 +9,9 @@
     <div class="container">
       <h1>🏠 SmartRent — Result</h1>
 
+      {% if error %}
+        <div class="card"><p style="color:red">{{ error }}</p></div>
+      {% else %}
       <div class="card">
         <h3>Predicted Fair Rent: <b>₹{{ predicted }}</b></h3>
         <h3>Listed Rent: <b>₹{{ listed }}</b></h3>
@@ -22,39 +25,42 @@
         {% if fallback_message %}
           <p style="color: gray; font-style: italic;">{{ fallback_message }}</p>
         {% endif %}
-        <table>
-          <thead>
-            <tr>
-              <th>Locality</th>
-              <th>BHK</th>
-              <th>Size (sqft)</th>
-              <th>Bath</th>
-              <th>Furnishing</th>
-              <th>Rent (₹)</th>
-              <th>Fair Rent (₹)</th>
-              <th>Value Score</th>
-              <th>Distance (km)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for s in suggestions %}
-            <tr>
-              <td>{{ s.locality }}</td>
-              <td>{{ s.bhk }}</td>
-              <td>{{ s.size_sqft }}</td>
-              <td>{{ s.bathrooms }}</td>
-              <td>{{ s.furnishing }}</td>
-              <td>{{ s.rent }}</td>
-              <td>{{ s.pred_rent }}</td>
-              <td>{{ s.value_score }}</td>
-              <td>{{ s.distance_km }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Locality</th>
+                <th>BHK</th>
+                <th>Size (sqft)</th>
+                <th>Bath</th>
+                <th>Furnishing</th>
+                <th>Rent (₹)</th>
+                <th>Fair Rent (₹)</th>
+                <th>Value Score</th>
+                <th>Distance (km)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in suggestions %}
+              <tr {% if loop.index0 == 0 %} style="background: linear-gradient(90deg,#e6f7ff,#fff);" {% endif %}>
+                <td>{{ s.locality }}</td>
+                <td>{{ s.bhk }}</td>
+                <td>{{ s.size_sqft }}</td>
+                <td>{{ s.bathrooms }}</td>
+                <td>{{ s.furnishing }}</td>
+                <td>₹{{ "{:,}".format(s.rent) }}</td>
+                <td>₹{{ "{:,}".format(s.pred_rent) }}</td>
+                <td>{{ s.value_score }}</td>
+                <td>{{ s.distance_km }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
       {% else %}
-      <p style="margin-top:20px;">😕 No nearby listings found within 8 km. Try increasing budget or changing locality.</p>
+      <p style="margin-top:20px;">😕 No nearby listings found. Try increasing budget or changing locality.</p>
+      {% endif %}
       {% endif %}
 
       <a class="back" href="/">← Back</a>

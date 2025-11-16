@@ -1,60 +1,77 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>SmartRent — Predict Rent</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  </head>
-  <body>
-    <div class="container">
-      <h1>🏠 SmartRent</h1>
-      <h3>Predict Fair Rent & Explore Rent Trends</h3>
+{% extends "base.html" %}
+{% block head %}
+  <meta name="description" content="SmartRent — Predict fair rent & explore rent trends">
+{% endblock %}
 
-      <form action="/predict" method="post" id="predictForm">
-        <label>City</label>
-        <input type="text" name="city" placeholder="Bengaluru" required>
-
-        <label>Locality</label>
-        <input type="text" name="locality" placeholder="Whitefield" required>
-
-        <label>BHK</label>
-        <input type="number" name="bhk" value="2" required min="1">
-
-        <label>Size (sqft)</label>
-        <input type="number" name="size" value="1000" required min="100">
-
-        <label>Bathrooms</label>
-        <input type="number" name="bath" value="2" required min="1">
-
-        <label>Furnishing</label>
-        <select name="furnishing">
-          <option>Unfurnished</option>
-          <option>Semi</option>
-          <option>Fully</option>
-        </select>
-
-        <label>Parking Spots</label>
-        <input type="number" name="parking" value="1" required min="0">
-
-        <label>Property Age (years)</label>
-        <input type="number" name="age" value="5" required min="0">
-
-        <label>Listed Rent (₹/month)</label>
-        <input type="number" name="listed_rent" value="25000" required min="0">
-
-        <button type="submit">🔍 Predict Fair Rent</button>
-      </form>
-
-      <h2 style="margin-top: 35px;">🗺️ Explore Bengaluru Rent Map</h2>
-      <p>Hover over dots to view rent details. Colors show price levels — <b style="color:blue;">Blue</b> (Low), <b style="color:orange;">Orange</b> (Medium), <b style="color:red;">Red</b> (High).</p>
-
-      <div id="map-container" class="map-wrapper">
-        {% if map_html %}
-          {{ map_html|safe }}
-        {% else %}
-          <p>Map not available.</p>
-        {% endif %}
-      </div>
+{% block content %}
+<div class="page-center">
+  <div class="form-card" role="region" aria-labelledby="predict-heading">
+    <div class="brand">
+      <div class="brand-icon">🏠</div>
+      <h1 id="predict-heading">SmartRent</h1>
+      <div class="sub">Predict Fair Rent Instantly</div>
     </div>
-  </body>
-</html>
+
+    <form class="predict-form" action="/predict" method="post" autocomplete="off">
+      <label for="city">City</label>
+      <input id="city" name="city" placeholder="Bengaluru" required>
+
+      <label for="locality">Locality</label>
+      <input id="locality" name="locality" placeholder="Whitefield" required>
+
+      <div class="row-two">
+        <div>
+          <label for="bhk">BHK</label>
+          <input id="bhk" name="bhk" type="number" min="0" value="2" required>
+        </div>
+        <div>
+          <label for="size">Size (sqft)</label>
+          <input id="size" name="size" type="number" min="100" value="1000" required>
+        </div>
+      </div>
+
+      <div class="row-two">
+        <div>
+          <label for="bath">Bathrooms</label>
+          <input id="bath" name="bath" type="number" min="0" value="2" required>
+        </div>
+        <div>
+          <label for="furnishing">Furnishing</label>
+          <select id="furnishing" name="furnishing">
+            <option>Unfurnished</option>
+            <option>Semi</option>
+            <option>Fully</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row-two">
+        <div>
+          <label for="parking">Parking Spots</label>
+          <input id="parking" name="parking" type="number" min="0" value="1" required>
+        </div>
+        <div>
+          <label for="age">Property Age (years)</label>
+          <input id="age" name="age" type="number" min="0" value="5" required>
+        </div>
+      </div>
+
+      <label for="listed_rent">Listed Rent (₹/month)</label>
+      <input id="listed_rent" name="listed_rent" type="number" value="25000" required>
+
+      <button class="btn-primary" type="submit">🔍 Predict Fair Rent</button>
+    </form>
+  </div>
+</div>
+
+<!-- Folium map area (map_html is produced server-side by folium and Markup) -->
+{% if map_html %}
+  <div class="container map-section">
+    <h2 class="map-title">🗺️ Explore Rent Map</h2>
+    <div class="map-wrapper">
+      {{ map_html|safe }}
+    </div>
+  </div>
+{% endif %}
+
+{% endblock %}

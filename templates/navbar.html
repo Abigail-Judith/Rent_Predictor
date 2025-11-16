@@ -1,0 +1,12 @@
+<nav class="navbar">
+  <div class="nav-left">
+    <a href="/" class="nav-logo">🏠 SmartRent</a>
+  </div>
+
+  <ul class="nav-links">
+    <li><a href="/" class="{{ 'active' if active_page=='predict' else '' }}">Predict</a></li>
+    <li><a href="/suggestions" class="{{ 'active' if active_page=='suggestions' else '' }}">Suggestions</a></li>
+    <li><a href="/analytics" class="{{ 'active' if active_page=='analytics' else '' }}">Analytics</a></li>
+    <li><a href="/compare" class="{{ 'active' if active_page=='compare' else '' }}">Compare</a></li>
+  </ul>
+</nav>

@@ -1,130 +1,18 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>SmartRent — Result</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% extends "base.html" %}
+{% block content %}
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+<div class="card">
+    <h2>SmartRent — Result</h2>
 
-  <style>
-    #mini-map {
-      width: 360px;
-      height: 300px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    }
-    .flexbox {
-      display: flex;
-      gap: 20px;
-      flex-wrap: wrap;
-    }
-  </style>
-</head>
-
-<body>
-<div class="container">
-
-  <h1>🏠 SmartRent — Result</h1>
-
-  {% if error %}
-    <div class="card"><p style="color:red">{{ error }}</p></div>
-  {% else %}
-  
-  <!-- Prediction Summary -->
-  <div class="card">
     <h3>Predicted Fair Rent: <b>₹{{ predicted }}</b></h3>
     <h3>Listed Rent: <b>₹{{ listed }}</b></h3>
+
     <h2 class="{{ color_class }}">{{ verdict }}</h2>
     <p>{{ insight }}</p>
-  </div>
 
-  <!-- Suggestions -->
-  {% if suggestions %}
-  <div class="card">
-    <h2>💡 Smart Value Suggestions</h2>
-    
-    {% if fallback_message %}
-      <p style="color: gray; font-style: italic;">{{ fallback_message }}</p>
-    {% endif %}
-
-    <div class="flexbox">
-
-      <!-- MINI MAP -->
-      <div id="mini-map"></div>
-
-      <!-- TABLE -->
-      <div class="table-wrapper" style="flex:1; min-width:450px;">
-        <table>
-          <thead>
-            <tr>
-              <th>Locality</th>
-              <th>BHK</th>
-              <th>Size</th>
-              <th>Bath</th>
-              <th>Furnish</th>
-              <th>Rent</th>
-              <th>Fair</th>
-              <th>Value</th>
-              <th>Dist (km)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for s in suggestions %}
-            <tr {% if loop.index0 == 0 %} style="background:#e6f9ff" {% endif %}>
-              <td>{{ s.locality }}</td>
-              <td>{{ s.bhk }}</td>
-              <td>{{ s.size_sqft }}</td>
-              <td>{{ s.bathrooms }}</td>
-              <td>{{ s.furnishing }}</td>
-              <td>₹{{ "{:,}".format(s.rent) }}</td>
-              <td>₹{{ "{:,}".format(s.pred_rent) }}</td>
-              <td>{{ s.value_score }}</td>
-              <td>{{ s.distance_km }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-    </div>
-  </div>
-  {% endif %}
-
-  {% endif %}
-
-  <a class="back" href="/">← Back</a>
-
+    <a href="/suggestions" class="btn-primary" style="margin-top: 20px; display:block;">
+        🔍 View Better Rental Options
+    </a>
 </div>
 
-<!-- Mini Map Script -->
-<script>
-  // ensure map_markers is always a JSON array (fallback to empty array)
-const markers = {{ map_markers | default([]) | tojson }};
-  
-  if (markers.length > 0) {
-      const map = L.map("mini-map").setView([markers[0].lat, markers[0].lon], 12);
-
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19
-      }).addTo(map);
-
-      markers.forEach(m => {
-          L.circleMarker([m.lat, m.lon], {
-              radius: m.type === "user" ? 8 : 6,
-              color: m.color || "blue",
-              fillColor: m.color || "blue",
-              fillOpacity: 0.9
-          }).addTo(map).bindPopup(m.popup);
-      });
-
-      if (markers.length > 1) {
-          const bounds = markers.map(m => [m.lat, m.lon]);
-          map.fitBounds(bounds, { padding: [20, 20] });
-      }
-  }
-</script>
-
-</body>
-</html>
+{% endblock %}

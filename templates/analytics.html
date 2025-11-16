@@ -1,15 +1,70 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>Analytics</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  </head>
-  <body>
-    {% include 'navbar.html' %}
-    <div class="container">
-      <h2>📈 Analytics</h2>
-      <p>Charts and summary stats (placeholder)</p>
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="center">📊 SmartRent Analytics Dashboard</h2>
+
+<div id="charts" style="max-width:1100px; margin:auto;">
+
+    <!-- 1. Average Rent by Locality -->
+    <div class="chart-card">
+        <h3>🏙️ Top 10 Localities — Average Rent</h3>
+        <div id="rentLocality"></div>
     </div>
-  </body>
-</html>
+
+    <!-- 2. Avg Rent by BHK -->
+    <div class="chart-card">
+        <h3>🛏️ Average Rent by BHK</h3>
+        <div id="bhkRent"></div>
+    </div>
+
+    <!-- 3. Furnishing Distribution -->
+    <div class="chart-card">
+        <h3>🛋 Furnishing Distribution</h3>
+        <div id="furnishDist"></div>
+    </div>
+
+    <!-- 4. Size vs Rent Scatter -->
+    <div class="chart-card">
+        <h3>📈 Size vs Rent Scatter Plot</h3>
+        <div id="sizeScatter"></div>
+    </div>
+
+</div>
+
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+<script>
+    // ---------- Locality Bar Chart ----------
+    Plotly.newPlot("rentLocality", [{
+        x: {{ avg_rent_locality.index.tolist() | safe }},
+        y: {{ avg_rent_locality.values.tolist() | safe }},
+        type: "bar",
+        marker: {color: "#1e88e5"}
+    }]);
+
+    // ---------- Rent by BHK ----------
+    Plotly.newPlot("bhkRent", [{
+        x: {{ bhk_rent.index.tolist() | safe }},
+        y: {{ bhk_rent.values.tolist() | safe }},
+        type: "bar",
+        marker: {color: "#43a047"}
+    }]);
+
+    // ---------- Furnishing Pie ----------
+    Plotly.newPlot("furnishDist", [{
+        labels: {{ furnish_count.index.tolist() | safe }},
+        values: {{ furnish_count.values.tolist() | safe }},
+        type: "pie"
+    }]);
+
+    // ---------- Size vs Rent ----------
+    var sizeData = {{ size_vs_rent | safe }};
+    Plotly.newPlot("sizeScatter", [{
+        x: sizeData.map(x => x.size_sqft),
+        y: sizeData.map(x => x.rent),
+        mode: "markers",
+        marker: {size: 6, color: "#ef5350"}
+    }]);
+</script>
+
+{% endblock %}

@@ -1,15 +1,107 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>Compare</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  </head>
-  <body>
-    {% include 'navbar.html' %}
-    <div class="container">
-      <h2>⚖️ Compare Listings</h2>
-      <p>Compare properties side-by-side (placeholder)</p>
-    </div>
-  </body>
-</html>
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+    <h2>Compare Localities</h2>
+
+    <!-- Form -->
+    <form method="POST" style="margin-bottom:20px;">
+        <label>Select Locality A</label>
+        <select name="loc_a" required>
+            <option value="">-- choose --</option>
+            {% for l in localities %}
+                <option value="{{ l }}" {% if loc_a == l %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Select Locality B</label>
+        <select name="loc_b" required>
+            <option value="">-- choose --</option>
+            {% for l in localities %}
+                <option value="{{ l }}" {% if loc_b == l %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+        </select>
+
+        <button class="btn-primary" type="submit" style="margin-top:12px;">Compare</button>
+    </form>
+
+    {% if error %}
+        <p style="color:red; font-weight:bold;">{{ error }}</p>
+    {% endif %}
+
+    {% if stats_a and stats_b %}
+    <hr>
+
+    <!-- Comparison Table -->
+    <h3>Comparison Summary</h3>
+
+    <table>
+        <tr>
+            <th>Metric</th>
+            <th>{{ loc_a }}</th>
+            <th>{{ loc_b }}</th>
+        </tr>
+        <tr>
+            <td>Avg Rent</td>
+            <td>₹{{ stats_a.avg_rent | int }}</td>
+            <td>₹{{ stats_b.avg_rent | int }}</td>
+        </tr>
+        <tr>
+            <td>Avg Fair Rent</td>
+            <td>₹{{ stats_a.avg_pred_rent | int }}</td>
+            <td>₹{{ stats_b.avg_pred_rent | int }}</td>
+        </tr>
+        <tr>
+            <td>Avg Size (sqft)</td>
+            <td>{{ stats_a.avg_size | int }}</td>
+            <td>{{ stats_b.avg_size | int }}</td>
+        </tr>
+        <tr>
+            <td>Avg BHK</td>
+            <td>{{ stats_a.avg_bhk | round(1) }}</td>
+            <td>{{ stats_b.avg_bhk | round(1) }}</td>
+        </tr>
+        <tr>
+            <td>Value Score</td>
+            <td>{{ stats_a.value_score | round(2) }}</td>
+            <td>{{ stats_b.value_score | round(2) }}</td>
+        </tr>
+    </table>
+
+    <hr>
+
+    <!-- Rent Comparison Chart -->
+    <h3>Rent Comparison Chart</h3>
+    <div id="compareChart" style="height:420px;"></div>
+
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script>
+        var labels = {{ chart_labels | safe }};
+        var listedVals = {{ listed_values | safe }};
+        var fairVals = {{ fair_values | safe }};
+
+        var data = [
+            {
+                x: labels,
+                y: listedVals,
+                type: 'bar',
+                name: "Avg Listed Rent"
+            },
+            {
+                x: labels,
+                y: fairVals,
+                type: 'bar',
+                name: "Avg Fair Rent"
+            }
+        ];
+
+        Plotly.newPlot("compareChart", data, {
+            title: "Rent Comparison",
+            barmode: 'group'
+        });
+    </script>
+
+    {% endif %}
+</div>
+
+{% endblock %}

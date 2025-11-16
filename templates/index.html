@@ -64,14 +64,11 @@
   </div>
 </div>
 
-<!-- Folium map area (map_html is produced server-side by folium and Markup) -->
-{% if map_html %}
-  <div class="container map-section">
-    <h2 class="map-title">🗺️ Explore Rent Map</h2>
-    <div class="map-wrapper">
-      {{ map_html|safe }}
-    </div>
+<!-- Full-city map below the form (keeps current behavior you liked) -->
+<div class="container map-section">
+  <h2 class="map-title">🗺️ Bengaluru Rent Map</h2>
+  <div class="map-wrapper">
+    {{ map_html | safe }}
   </div>
-{% endif %}
-
+</div>
 {% endblock %}

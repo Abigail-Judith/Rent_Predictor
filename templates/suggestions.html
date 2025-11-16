@@ -1,64 +1,60 @@
 {% extends "base.html" %}
 {% block content %}
 
-<!-- PAGE WRAPPER -->
-<div class="content-section">
+<div class="card suggestions-card">
+  <h2>💡 Smart Value Suggestions</h2>
+  <p class="muted">Top matching suggestions (same city, same BHK, within 6 km, size 70%–130%).</p>
 
-    <!-- ⭐ Smart Value Suggestions (TABLE FIRST) -->
-    <div class="card suggestions-card">
+  <div style="display:flex; align-items:center; gap:18px; margin-bottom:12px;">
+    {% if predicted_from_q %}
+      <div><strong>Predicted (your search):</strong> ₹{{ predicted_from_q }}</div>
+    {% endif %}
+    {% if listed_from_q %}
+      <div><strong>Listed (your search):</strong> ₹{{ listed_from_q }}</div>
+    {% endif %}
+  </div>
 
-        <h2 class="section-title">
-            <span class="emoji">💡</span> Smart Value Suggestions
-        </h2>
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Locality</th>
+          <th>BHK</th>
+          <th>Size</th>
+          <th>Bath</th>
+          <th>Rent</th>
+          <th>Fair Rent</th>
+          <th>Value</th>
+          <th>Dist (km)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if suggestions %}
+          {% for s in suggestions %}
+          <tr {% if loop.index0 == 0 %} class="highlight" {% endif %}>
+            <td>{{ s.locality }}</td>
+            <td>{{ s.bhk }}</td>
+            <td>{{ s.size_sqft }}</td>
+            <td>{{ s.bathrooms }}</td>
+            <td>₹{{ "{:,}".format(s.rent) }}</td>
+            <td>₹{{ "{:,}".format(s.pred_rent) }}</td>
+            <td>{{ s.value_score }}</td>
+            <td>{{ s.distance_km if s.distance_km is not none else "—" }}</td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="8">No suggestions found. Try changing search parameters.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
 
-        <p class="section-sub">Top 5 best rental deals based on value score</p>
-
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Locality</th>
-                        <th>BHK</th>
-                        <th>Size</th>
-                        <th>Bath</th>
-                        <th>Furnish</th>
-                        <th>Rent</th>
-                        <th>Fair Rent</th>
-                        <th>Value</th>
-                        <th>Dist (km)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for s in suggestions %}
-                    <tr>
-                        <td>{{ s.locality }}</td>
-                        <td>{{ s.bhk }}</td>
-                        <td>{{ s.size_sqft }}</td>
-                        <td>{{ s.bathrooms }}</td>
-                        <td>{{ s.furnishing }}</td>
-                        <td>₹{{ '{:,}'.format(s.rent) }}</td>
-                        <td>₹{{ '{:,}'.format(s.pred_rent) }}</td>
-                        <td>{{ s.value_score }}</td>
-                        <td>{{ s.distance_km }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-    </div>
-
-    <!-- 🗺 MAP SECOND -->
-    <div class="card map-card" style="margin-top: 22px;">
-        <h2 class="section-title">
-            <span class="emoji">🗺️</span> Bengaluru Rental Map
-        </h2>
-
-        <div class="map-wrapper">
-            {{ map_html|safe }}
-        </div>
-    </div>
-
+<div class="card map-card" style="margin-top:18px;">
+  <h2>🗺️ Map — Suggested Areas</h2>
+  <div class="map-wrapper">
+    {{ map_html | safe }}
+  </div>
 </div>
 
 {% endblock %}

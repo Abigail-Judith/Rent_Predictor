@@ -1,18 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="card">
-    <h2>SmartRent — Result</h2>
+<div class="card result-card">
+  <div class="result-figures">
+    <div>
+      <div class="label">Predicted Fair Rent</div>
+      <div class="value">₹{{ predicted | int | string }}</div>
+    </div>
+    <div>
+      <div class="label">Listed Rent</div>
+      <div class="value">₹{{ listed | int | string }}</div>
+    </div>
+  </div>
 
-    <h3>Predicted Fair Rent: <b>₹{{ predicted }}</b></h3>
-    <h3>Listed Rent: <b>₹{{ listed }}</b></h3>
+  <div class="verdict {{ color_class }}">{{ verdict }}</div>
+  <p class="insight">{{ insight }}</p>
 
-    <h2 class="{{ color_class }}">{{ verdict }}</h2>
-    <p>{{ insight }}</p>
-
-    <a href="/suggestions" class="btn-primary" style="margin-top: 20px; display:block;">
-        🔍 View Better Rental Options
+  <div style="margin-top:14px;">
+    <a href="/suggestions?{{ suggestions_qs }}" class="btn-primary" style="display:inline-block; width:260px; text-align:center;">
+      🔍 View matching suggestions
     </a>
+    <a href="/" class="back" style="margin-left:12px;">← Back to Predict</a>
+  </div>
 </div>
 
 {% endblock %}

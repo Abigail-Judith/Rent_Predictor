@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% block head %}
-  <meta name="description" content="SmartRent — Predict fair rent & explore rent trends">
+  <meta name="description" content="RentVizion — Predict fair rent & explore rent trends">
 {% endblock %}
 
 {% block content %}
 <div class="page-center">
-  <div class="form-card" role="region" aria-labelledby="predict-heading">
+  <div class="form-card glass-card animate-fade-up" role="region" aria-labelledby="predict-heading">
     <div class="brand">
       <div class="brand-icon">🏠</div>
-      <h1 id="predict-heading">SmartRent</h1>
-      <div class="sub">Predict Fair Rent Instantly</div>
+      <h1 id="predict-heading">RentVizion</h1>
+      <div class="sub">Predict Fair Rent · Explore Neighborhoods</div>
     </div>
 
     <form class="predict-form" action="/predict" method="post" autocomplete="on">
@@ -59,15 +59,15 @@
       <label for="listed_rent">Listed Rent (₹/month)</label>
       <input id="listed_rent" name="listed_rent" type="number" value="25000" required>
 
-      <button class="btn-primary" type="submit">🔍 Predict Fair Rent</button>
+      <button class="btn-glass" type="submit">🔍 Predict Fair Rent</button>
     </form>
   </div>
 </div>
 
-<!-- Full-city map below the form (keeps current behavior you liked) -->
+<!-- Full-city map below the form -->
 <div class="container map-section">
   <h2 class="map-title">🗺️ Bengaluru Rent Map</h2>
-  <div class="map-wrapper">
+  <div class="map-wrapper glass-map animate-fade-up">
     {{ map_html | safe }}
   </div>
 </div>

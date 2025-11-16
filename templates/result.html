@@ -1,26 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="card result-card">
+<div class="card result-card glass-card animate-fade-up">
   <div class="result-figures">
     <div>
       <div class="label">Predicted Fair Rent</div>
-      <div class="value">₹{{ predicted | int | string }}</div>
+      <div class="value">₹{{ predicted | int }}</div>
     </div>
     <div>
       <div class="label">Listed Rent</div>
-      <div class="value">₹{{ listed | int | string }}</div>
+      <div class="value">₹{{ listed | int }}</div>
     </div>
   </div>
 
   <div class="verdict {{ color_class }}">{{ verdict }}</div>
   <p class="insight">{{ insight }}</p>
 
-  <div style="margin-top:14px;">
-    <a href="/suggestions?{{ suggestions_qs }}" class="btn-primary" style="display:inline-block; width:260px; text-align:center;">
+  <div class="result-actions">
+    <a href="/suggestions?{{ suggestions_qs }}" class="btn-glass" style="display:inline-block; width:260px; text-align:center;">
       🔍 View matching suggestions
     </a>
-    <a href="/" class="back" style="margin-left:12px;">← Back to Predict</a>
+    <a href="/" class="btn-ghost" style="margin-left:12px;">← Back to Predict</a>
   </div>
 </div>
 

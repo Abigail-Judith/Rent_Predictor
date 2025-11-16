@@ -7,12 +7,10 @@
 
   <div style="display:flex; align-items:center; gap:18px; margin-bottom:12px;">
     {% if predicted_from_q %}
-      <div><strong>Predicted (your search):</strong> ₹{{ predicted_from_q }}</div>
+      <div><strong>Predicted Rent:</strong> ₹{{ predicted_from_q }}</div>
     {% endif %}
-    {% if listed_from_q %}
-      <div><strong>Listed (your search):</strong> ₹{{ listed_from_q }}</div>
-    {% endif %}
-  </div>
+</div>
+
 
   <div class="table-wrapper">
     <table>

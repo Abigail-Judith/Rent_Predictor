@@ -1,78 +1,101 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="card">
-    <h2>Compare Localities</h2>
+<div class="glass-card animate-fade-up" style="padding:26px;">
 
-    <!-- Form -->
-    <form method="POST" style="margin-bottom:20px;">
-        <label>Select Locality A</label>
-        <select name="loc_a" required>
-            <option value="">-- choose --</option>
-            {% for l in localities %}
-                <option value="{{ l }}" {% if loc_a == l %}selected{% endif %}>{{ l }}</option>
-            {% endfor %}
-        </select>
+    <h2 style="margin-top:0; font-size:24px; font-weight:800; color:#061226;">
+        Compare Localities
+    </h2>
 
-        <label>Select Locality B</label>
-        <select name="loc_b" required>
-            <option value="">-- choose --</option>
-            {% for l in localities %}
-                <option value="{{ l }}" {% if loc_b == l %}selected{% endif %}>{{ l }}</option>
-            {% endfor %}
-        </select>
+    <!-- Compare Form -->
+    <form method="POST" class="compare-form">
 
-        <button class="btn-primary" type="submit" style="margin-top:12px;">Compare</button>
+        <div class="compare-row">
+            <div class="compare-field">
+                <label>Locality A</label>
+                <select name="loc_a" class="compare-select" required>
+                    <option value="">-- choose --</option>
+                    {% for l in localities %}
+                        <option value="{{ l }}" {% if loc_a == l %}selected{% endif %}>{{ l }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="compare-field">
+                <label>Locality B</label>
+                <select name="loc_b" class="compare-select" required>
+                    <option value="">-- choose --</option>
+                    {% for l in localities %}
+                        <option value="{{ l }}" {% if loc_b == l %}selected{% endif %}>{{ l }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <button class="btn-primary compare-btn" type="submit" style="margin-top:10px;">
+            Compare
+        </button>
+
     </form>
 
     {% if error %}
-        <p style="color:red; font-weight:bold;">{{ error }}</p>
+        <p style="color:#d32f2f; font-weight:700; margin-top:10px;">{{ error }}</p>
     {% endif %}
 
     {% if stats_a and stats_b %}
-    <hr>
+    <hr style="margin:26px 0; border-color:rgba(0,0,0,0.05);">
 
-    <!-- Comparison Table -->
-    <h3>Comparison Summary</h3>
+    <!-- Comparison Summary -->
+    <h3 style="font-size:20px; font-weight:800; margin-bottom:18px;">Comparison Summary</h3>
 
-    <table>
-        <tr>
-            <th>Metric</th>
-            <th>{{ loc_a }}</th>
-            <th>{{ loc_b }}</th>
-        </tr>
-        <tr>
-            <td>Avg Rent</td>
-            <td>₹{{ stats_a.avg_rent | int }}</td>
-            <td>₹{{ stats_b.avg_rent | int }}</td>
-        </tr>
-        <tr>
-            <td>Avg Fair Rent</td>
-            <td>₹{{ stats_a.avg_pred_rent | int }}</td>
-            <td>₹{{ stats_b.avg_pred_rent | int }}</td>
-        </tr>
-        <tr>
-            <td>Avg Size (sqft)</td>
-            <td>{{ stats_a.avg_size | int }}</td>
-            <td>{{ stats_b.avg_size | int }}</td>
-        </tr>
-        <tr>
-            <td>Avg BHK</td>
-            <td>{{ stats_a.avg_bhk | round(1) }}</td>
-            <td>{{ stats_b.avg_bhk | round(1) }}</td>
-        </tr>
-        <tr>
-            <td>Value Score</td>
-            <td>{{ stats_a.value_score | round(2) }}</td>
-            <td>{{ stats_b.value_score | round(2) }}</td>
-        </tr>
-    </table>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>{{ loc_a }}</th>
+                    <th>{{ loc_b }}</th>
+                </tr>
+            </thead>
 
-    <hr>
+            <tbody>
+                <tr>
+                    <td>Avg Rent</td>
+                    <td>₹{{ stats_a.avg_rent | int }}</td>
+                    <td>₹{{ stats_b.avg_rent | int }}</td>
+                </tr>
+                <tr>
+                    <td>Avg Fair Rent</td>
+                    <td>₹{{ stats_a.avg_pred_rent | int }}</td>
+                    <td>₹{{ stats_b.avg_pred_rent | int }}</td>
+                </tr>
+                <tr>
+                    <td>Avg Size (sqft)</td>
+                    <td>{{ stats_a.avg_size | int }}</td>
+                    <td>{{ stats_b.avg_size | int }}</td>
+                </tr>
+                <tr>
+                    <td>Avg BHK</td>
+                    <td>{{ stats_a.avg_bhk | round(1) }}</td>
+                    <td>{{ stats_b.avg_bhk | round(1) }}</td>
+                </tr>
+                <tr>
+                    <td>Value Score</td>
+                    <td>{{ stats_a.value_score | round(2) }}</td>
+                    <td>{{ stats_b.value_score | round(2) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
-    <!-- Rent Comparison Chart -->
-    <h3>Rent Comparison Chart</h3>
-    <div id="compareChart" style="height:420px;"></div>
+    <hr style="margin:26px 0; border-color:rgba(0,0,0,0.05);">
+
+    <!-- Rent Chart -->
+    <h3 style="font-size:20px; font-weight:800; margin-bottom:14px;">
+        Rent Comparison Chart
+    </h3>
+
+    <div id="compareChart" style="height:430px; border-radius:14px;"></div>
 
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script>
@@ -85,19 +108,24 @@
                 x: labels,
                 y: listedVals,
                 type: 'bar',
-                name: "Avg Listed Rent"
+                name: "Avg Listed Rent",
+                marker: { color: 'rgba(123,47,247,0.65)' }
             },
             {
                 x: labels,
                 y: fairVals,
                 type: 'bar',
-                name: "Avg Fair Rent"
+                name: "Avg Fair Rent",
+                marker: { color: 'rgba(10,179,255,0.65)' }
             }
         ];
 
         Plotly.newPlot("compareChart", data, {
-            title: "Rent Comparison",
-            barmode: 'group'
+            title: "",
+            barmode: 'group',
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            margin: { t: 20 }
         });
     </script>
 

@@ -63,3 +63,10 @@ tr:nth-child(even) { background-color: #fbfdff; }
   .map-wrapper { height: 360px; }
   .container { padding: 16px; }
 }
+
+
+/* result page mini-map */
+#mini-map {
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+}

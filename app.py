@@ -21,209 +21,199 @@ ENCODERS_PATH = MODELS_DIR / "encoders.pkl"
 RAW_CSV = DATA_DIR / "rent_listings_sample.csv"
 
 # -----------------------------
-# Load model, encoders, data
+# Load model + encoders + data
 # -----------------------------
 if not MODEL_PATH.exists() or not ENCODERS_PATH.exists():
-    raise FileNotFoundError("models/smartrent_model.pkl or models/encoders.pkl missing. Run train_model.py first.")
+    raise FileNotFoundError("Model or encoder missing — run train_model.py")
 
 model = joblib.load(MODEL_PATH)
-encoders = joblib.load(ENCODERS_PATH)  # dict with LabelEncoders: city, locality, furnishing
+encoders = joblib.load(ENCODERS_PATH)
+
 le_city = encoders["city"]
 le_locality = encoders["locality"]
 le_furnish = encoders["furnishing"]
 
-# Raw dataframe with lat/lon (source of truth)
-if not RAW_CSV.exists():
-    raise FileNotFoundError(f"{RAW_CSV} not found.")
 raw = pd.read_csv(RAW_CSV).dropna(subset=["latitude", "longitude"])
 
-# Precompute most common for fallbacks
+# -----------------------------
+# Fallbacks
+# -----------------------------
 most_common_city = raw["city"].mode().iloc[0]
 most_common_locality = raw["locality"].mode().iloc[0]
 most_common_furn = raw["furnishing"].mode().iloc[0]
 
-# Pre-encode the dataset for model predictions (safe, no encoder mutation)
+
+# -----------------------------
+# Encoding Helpers
+# -----------------------------
 def encode_column_series(series, encoder):
-    """Encode a pandas Series using encoder; if unseen values appear, use fuzzy matching or fallback."""
+    """Encode Series safely with fuzzy matching."""
     out = []
     classes = list(map(str, encoder.classes_))
+
     for v in series.astype(str).str.strip():
-        v_str = v.strip()
-        # 1) exact case-insensitive match to any class
-        match = next((c for c in classes if c.lower() == v_str.lower()), None)
-        if match is not None:
+        vstr = v.lower()
+
+        # 1. exact match
+        match = next((c for c in classes if c.lower() == vstr), None)
+        if match:
             out.append(int(encoder.transform([match])[0]))
             continue
-        # 2) fuzzy match
-        close = get_close_matches(v_str, classes, n=1, cutoff=0.6)
+
+        # 2. fuzzy
+        close = get_close_matches(v, classes, n=1, cutoff=0.6)
         if close:
             out.append(int(encoder.transform([close[0]])[0]))
             continue
-        # 3) fallback to most common (use original series' mode if available)
-        fallback = series.mode().iloc[0] if not series.mode().empty else classes[0]
-        # if fallback not in encoder classes, use encoder.classes_[0]
-        fb_match = next((c for c in classes if c.lower() == str(fallback).strip().lower()), None)
-        if fb_match is None:
-            fb_match = classes[0]
+
+        # 3. fallback
+        fb = series.mode().iloc[0]
+        fb_match = next((c for c in classes if c.lower() == str(fb).lower()), classes[0])
         out.append(int(encoder.transform([fb_match])[0]))
+
     return np.array(out, dtype=int)
 
-# Create a copy with encoded columns for predictions + suggestions
+
+def safe_encode_input(value, encoder, raw_series):
+    classes = list(map(str, encoder.classes_))
+    v = str(value).strip().lower()
+
+    # exact match
+    match = next((c for c in classes if c.lower() == v), None)
+    if match:
+        return int(encoder.transform([match])[0])
+
+    # fuzzy
+    close = get_close_matches(value, classes, n=1, cutoff=0.6)
+    if close:
+        return int(encoder.transform([close[0]])[0])
+
+    # fallback
+    fb = raw_series.mode().iloc[0]
+    fb_match = next((c for c in classes if c.lower() == str(fb).lower()), classes[0])
+    return int(encoder.transform([fb_match])[0])
+
+
+# -----------------------------
+# Build Encoded DataFrame
+# -----------------------------
 enc_df = raw.copy()
 enc_df["city_enc"] = encode_column_series(enc_df["city"], le_city)
 enc_df["locality_enc"] = encode_column_series(enc_df["locality"], le_locality)
 enc_df["furnishing_enc"] = encode_column_series(enc_df["furnishing"], le_furnish)
 
-# Features used by the model (ensure same order as training)
-FEATURE_COLS = ["city", "locality", "bhk", "size_sqft", "bathrooms", "furnishing", "parking", "age_yrs"]
-# We'll create a numeric feature frame using encoded columns for the categorical fields
-def df_features_from_enc_df(df_enc):
-    X = pd.DataFrame({
-        "city": df_enc["city_enc"],
-        "locality": df_enc["locality_enc"],
-        "bhk": df_enc["bhk"].astype(int),
-        "size_sqft": df_enc["size_sqft"].astype(float),
-        "bathrooms": df_enc["bathrooms"].astype(int),
-        "furnishing": df_enc["furnishing_enc"],
-        "parking": df_enc["parking"].astype(int),
-        "age_yrs": df_enc["age_yrs"].astype(int),
-    })
-    return X
+# Predict full dataset (for suggestions)
+FEATURES = ["city", "locality", "bhk", "size_sqft", "bathrooms", "furnishing", "parking", "age_yrs"]
 
-# Precompute model predictions for the dataset (used for suggestions & map coloring)
-features_all = df_features_from_enc_df(enc_df)
-enc_df["pred_rent"] = model.predict(features_all)
-enc_df["value_score"] = (enc_df["pred_rent"] - enc_df["rent"]) / enc_df["pred_rent"].replace(0, np.nan)
+X_all = pd.DataFrame({
+    "city": enc_df["city_enc"],
+    "locality": enc_df["locality_enc"],
+    "bhk": enc_df["bhk"],
+    "size_sqft": enc_df["size_sqft"],
+    "bathrooms": enc_df["bathrooms"],
+    "furnishing": enc_df["furnishing_enc"],
+    "parking": enc_df["parking"],
+    "age_yrs": enc_df["age_yrs"]
+})
+
+enc_df["pred_rent"] = model.predict(X_all)
+enc_df["value_score"] = (enc_df["pred_rent"] - enc_df["rent"]) / enc_df["pred_rent"]
+
 
 # -----------------------------
-# Helpers
+# Geolocation + Math Helpers
 # -----------------------------
 def haversine(lat1, lon1, lat2, lon2):
-    R = 6371.0
+    R = 6371
     lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
-    dlat, dlon = lat2 - lat1, lon2 - lon1
-    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    a = (math.sin((lat2 - lat1) / 2) ** 2 +
+         math.cos(lat1) * math.cos(lat2) *
+         math.sin((lon2 - lon1) / 2) ** 2)
     return 2 * R * math.asin(math.sqrt(a))
 
-def safe_encode_input(value, encoder, raw_series):
-    """Encode a single user input value using encoder with fuzzy fallback. Returns int code."""
-    classes = list(map(str, encoder.classes_))
-    v = str(value).strip()
-    # exact case-insensitive
-    match = next((c for c in classes if c.lower() == v.lower()), None)
-    if match:
-        return int(encoder.transform([match])[0])
-    # fuzzy
-    close = get_close_matches(v, classes, n=1, cutoff=0.6)
-    if close:
-        return int(encoder.transform([close[0]])[0])
-    # fallback to raw data mode for that column
-    fallback = raw_series.mode().iloc[0] if not raw_series.mode().empty else classes[0]
-    fb_match = next((c for c in classes if c.lower() == str(fallback).strip().lower()), classes[0])
-    return int(encoder.transform([fb_match])[0])
 
-def find_latlon_for_locality(locality_input, city_input=None):
-    """Find best lat/lon for a user locality string (case-insensitive exact, then city centroid, then dataset first row)."""
-    li = str(locality_input).strip().lower()
-    # exact case-insensitive match
-    mask = raw["locality"].astype(str).str.strip().str.lower() == li
-    if not raw[mask].empty:
-        r = raw[mask].iloc[0]
+def find_latlon_for_locality(locality, city):
+    li = locality.strip().lower()
+
+    # 1. exact locality
+    m = raw[raw["locality"].str.strip().str.lower() == li]
+    if not m.empty:
+        r = m.iloc[0]
         return float(r["latitude"]), float(r["longitude"])
-    # fuzzy match across all localities
-    candidates = raw["locality"].astype(str).str.strip().unique().tolist()
-    close = get_close_matches(locality_input, candidates, n=1, cutoff=0.6)
+
+    # 2. fuzzy
+    all_loc = raw["locality"].str.strip().unique().tolist()
+    close = get_close_matches(locality, all_loc, n=1, cutoff=0.6)
     if close:
-        r = raw[raw["locality"].astype(str).str.strip() == close[0]].iloc[0]
+        r = raw[raw["locality"].str.strip() == close[0]].iloc[0]
         return float(r["latitude"]), float(r["longitude"])
-    # try city centroid
-    if city_input is not None:
-        cmask = raw["city"].astype(str).str.strip().str.lower() == str(city_input).strip().lower()
-        if not raw[cmask].empty:
-            # return median lat/lon for city
-            lat = float(raw[cmask]["latitude"].median())
-            lon = float(raw[cmask]["longitude"].median())
-            return lat, lon
-    # fallback to dataset mean coordinates
+
+    # 3. city centroid
+    cm = raw[raw["city"].str.lower() == city.lower()]
+    if not cm.empty:
+        return float(cm["latitude"].median()), float(cm["longitude"].median())
+
+    # 4. fallback
     return float(raw["latitude"].median()), float(raw["longitude"].median())
 
+
 def format_currency(x):
-    try:
-        return f"₹{int(x):,}"
-    except Exception:
-        return x
+    return f"₹{int(x):,}"
+
 
 # -----------------------------
-# Routes
+# Home + Map Routes
 # -----------------------------
 @app.route("/")
 def home():
-    # generate a compact folium map and pass HTML fragment into template (no static file)
-    m = folium.Map(location=[raw["latitude"].median(), raw["longitude"].median()], zoom_start=12, tiles="CartoDB positron")
-    mc = MarkerCluster()
-    # color by rent percentiles
+    center = [raw["latitude"].median(), raw["longitude"].median()]
+    m = folium.Map(location=center, zoom_start=12, tiles="CartoDB positron")
+    mc = MarkerCluster().add_to(m)
+
     p25, p75 = raw["rent"].quantile(0.25), raw["rent"].quantile(0.75)
+
     for _, r in raw.iterrows():
         rent = r["rent"]
-        if rent < p25:
-            color = "blue"
-        elif rent > p75:
-            color = "red"
-        else:
-            color = "orange"
-        popup = f"<b>Locality:</b> {r['locality']}<br><b>BHK:</b> {r['bhk']} | <b>Size:</b> {r['size_sqft']} sqft<br><b>Rent:</b> {format_currency(rent)}"
-        folium.CircleMarker(location=[r["latitude"], r["longitude"]], radius=6, color=color, fill=True, fill_opacity=0.7, popup=popup).add_to(mc)
-    mc.add_to(m)
-    map_html = m._repr_html_()
-    return render_template("index.html", map_html=Markup(map_html))
+        color = "blue" if rent < p25 else "red" if rent > p75 else "orange"
 
-@app.route("/map")
-def rent_map():
-    # same as above but renders full page for map route
-    m = folium.Map(location=[raw["latitude"].median(), raw["longitude"].median()], zoom_start=12, tiles="CartoDB positron")
-    mc = MarkerCluster()
-    p25, p75 = raw["rent"].quantile(0.25), raw["rent"].quantile(0.75)
-    for _, r in raw.iterrows():
-        rent = r["rent"]
-        if rent < p25:
-            color = "blue"
-        elif rent > p75:
-            color = "red"
-        else:
-            color = "orange"
-        popup = f"<b>Locality:</b> {r['locality']}<br><b>BHK:</b> {r['bhk']} | <b>Size:</b> {r['size_sqft']} sqft<br><b>Rent:</b> {format_currency(rent)}"
-        folium.CircleMarker(location=[r["latitude"], r["longitude"]], radius=6, color=color, fill=True, fill_opacity=0.7, popup=popup).add_to(mc)
-    mc.add_to(m)
-    map_html = m._repr_html_()
-    return render_template("map.html", map_html=Markup(map_html))
+        popup = f"<b>{r['locality']}</b><br>{r['bhk']} BHK · {r['size_sqft']} sqft<br>Rent: {format_currency(rent)}"
+        folium.CircleMarker(
+            location=[r["latitude"], r["longitude"]],
+            radius=6, color=color, fill=True, fill_opacity=0.8,
+            popup=popup
+        ).add_to(mc)
 
+    return render_template("index.html", map_html=Markup(m._repr_html_()))
+
+
+# -----------------------------
+# PREDICT + MINI-MAP ROUTE
+# -----------------------------
 @app.route("/predict", methods=["POST"])
 def predict():
-    # 1. collect & validate input
-    try:
-        city = request.form["city"].strip()
-        locality = request.form["locality"].strip()
-        bhk = int(request.form["bhk"])
-        size = float(request.form["size"])
-        bath = int(request.form["bath"])
-        furnishing = request.form["furnishing"].strip()
-        parking = int(request.form["parking"])
-        age = int(request.form["age"])
-        listed = float(request.form["listed_rent"])
-    except Exception as e:
-        return render_template("result.html", error="Invalid input. Please check your form values."), 400
+    # collect input
+    city = request.form["city"].strip()
+    locality = request.form["locality"].strip()
+    bhk = int(request.form["bhk"])
+    size = float(request.form["size"])
+    bath = int(request.form["bath"])
+    furnishing = request.form["furnishing"].strip()
+    parking = int(request.form["parking"])
+    age = int(request.form["age"])
+    listed = float(request.form["listed_rent"])
 
-    # 2. encode safely using fuzzy fallback (no encoder mutation)
+    # encode input
     city_enc = safe_encode_input(city, le_city, raw["city"])
     locality_enc = safe_encode_input(locality, le_locality, raw["locality"])
     furnish_enc = safe_encode_input(furnishing, le_furnish, raw["furnishing"])
 
-    # 3. predict
+    # model predict
     X = np.array([[city_enc, locality_enc, bhk, size, bath, furnish_enc, parking, age]])
     pred = float(model.predict(X)[0])
 
     diff = listed - pred
-    pct = (diff / pred) * 100 if pred else 0
+    pct = (diff / pred) * 100
+
     if pct > 10:
         verdict = f"❌ Overpriced by {pct:.1f}%"
         color_class = "red"
@@ -236,90 +226,88 @@ def predict():
 
     insight = f"For a {bhk}BHK ~{int(size)} sqft in {locality}, fair rent is around {format_currency(pred)}."
 
-    # 4. prepare suggestions dataset (use enc_df which already has model preds)
+    # suggestions
     df = enc_df.copy()
 
-    # compute distances using lat/lon from raw dataset (find user's lat/lon)
     lat_user, lon_user = find_latlon_for_locality(locality, city)
-    df["distance_km"] = df.apply(lambda r: haversine(lat_user, lon_user, float(r["latitude"]), float(r["longitude"])), axis=1)
+    df["dist"] = df.apply(lambda r: haversine(lat_user, lon_user, r["latitude"], r["longitude"]), axis=1)
 
-    # candidates: same city (use encoded city match)
-    candidates = df[df["city_enc"] == city_enc].copy()
-
-    # value score already computed; recompute if needed for safety
-    candidates["value_score"] = (candidates["pred_rent"] - candidates["rent"]) / candidates["pred_rent"].replace(0, np.nan)
+    cand = df[df["city_enc"] == city_enc].copy()
 
     # budget logic
-    if listed > pred:
-        max_budget = pred * 1.05
-    else:
-        max_budget = pred * 1.3
+    max_budget = pred * (1.05 if listed > pred else 1.3)
 
-    def top5_from_df(dff):
-        cols = ["locality", "bhk", "size_sqft", "bathrooms", "furnishing", "rent", "pred_rent", "value_score", "distance_km"]
-        out = dff.sort_values("value_score", ascending=False)[cols].head(5).copy()
-        if not out.empty:
-            out["pred_rent"] = out["pred_rent"].round(0).astype(int)
-            out["value_score"] = out["value_score"].round(2)
-            out["distance_km"] = out["distance_km"].round(2)
-        return out
-
-    # Step 1: nearby similar size ±20%, same bhk, distance <= 6, rent <= max_budget
-    mask = (
-        (candidates["bhk"] == bhk)
-        & (candidates["size_sqft"].between(size * 0.8, size * 1.2))
-        & (candidates["distance_km"] <= 6)
-        & (candidates["rent"] <= max_budget)
-    )
-    sug = top5_from_df(candidates[mask])
-
-    # Step 2: expand to 8 km and widen size tolerance
-    if sug.empty:
-        mask = (
-            (candidates["bhk"] == bhk)
-            & (candidates["size_sqft"].between(size * 0.7, size * 1.3))
-            & (candidates["distance_km"] <= 8)
-            & (candidates["rent"] <= max_budget)
+    def pick(df, min_s=0.8, max_s=1.2, max_d=6):
+        m = (
+            (df["bhk"] == bhk)
+            & df["size_sqft"].between(size * min_s, size * max_s)
+            & (df["dist"] <= max_d)
+            & (df["rent"] <= max_budget)
         )
-        sug = top5_from_df(candidates[mask])
+        return df[m].sort_values("value_score", ascending=False).head(5)
 
-    # Step 3: city-wide best deals (no budget)
-    fallback_message = ""
+    sug = pick(cand)
+
     if sug.empty:
-        sug = top5_from_df(candidates)
-        fallback_message = "⚠️ No exact in-budget matches nearby. Showing best value rentals in the city."
+        sug = pick(cand, 0.7, 1.3, 8)
 
-    if not sug.empty and not fallback_message:
-        fallback_message = f"🏙️ Showing best value rentals near {locality}."
+    fallback = ""
+    if sug.empty:
+        sug = cand.sort_values("value_score", ascending=False).head(5)
+        fallback = "⚠️ No nearby matches. Showing best deals in the city."
+    else:
+        fallback = f"🏙️ Best value rentals near {locality}"
 
-    # format suggestions for template
+    # build suggestion list + map markers
     suggestions = []
-    if not sug.empty:
-        for _, r in sug.iterrows():
-            suggestions.append({
-                "locality": r["locality"],
-                "bhk": int(r["bhk"]),
-                "size_sqft": int(r["size_sqft"]),
-                "bathrooms": int(r["bathrooms"]),
-                "furnishing": r["furnishing"],
-                "rent": int(r["rent"]),
-                "pred_rent": int(r["pred_rent"]),
-                "value_score": float(r["value_score"]),
-                "distance_km": float(r["distance_km"]),
-            })
+    map_markers = []
 
-    # return result
+    # user pin
+    map_markers.append({
+        "type": "user",
+        "lat": lat_user,
+        "lon": lon_user,
+        "color": "black",
+        "popup": f"You: {locality}<br>{bhk} BHK • {int(size)} sqft<br>Rent: {format_currency(listed)}"
+    })
+
+    for _, r in sug.iterrows():
+        suggestions.append({
+            "locality": r["locality"],
+            "bhk": int(r["bhk"]),
+            "size_sqft": int(r["size_sqft"]),
+            "bathrooms": int(r["bathrooms"]),
+            "furnishing": r["furnishing"],
+            "rent": int(r["rent"]),
+            "pred_rent": int(r["pred_rent"]),
+            "value_score": round(float(r["value_score"]), 2),
+            "distance_km": round(float(r["dist"]), 2)
+        })
+
+        score = r["value_score"]
+        color = "green" if score >= 0.12 else ("orange" if score >= 0.05 else "red")
+
+        map_markers.append({
+            "type": "suggestion",
+            "lat": float(r["latitude"]),
+            "lon": float(r["longitude"]),
+            "color": color,
+            "popup": f"<b>{r['locality']}</b><br>{r['bhk']} BHK • {int(r['size_sqft'])} sqft<br>"
+                     f"Rent: {format_currency(r['rent'])}"
+        })
+
     return render_template(
         "result.html",
-        predicted=int(round(pred)),
-        listed=int(round(listed)),
+        predicted=int(pred),
+        listed=int(listed),
         verdict=verdict,
         color_class=color_class,
         insight=insight,
         suggestions=suggestions,
-        fallback_message=fallback_message,
-        map_html=None,  # keep map out of result page to avoid heavy rendering here
+        fallback_message=fallback,
+        map_markers=map_markers
     )
+
 
 if __name__ == "__main__":
     app.run(debug=True)
